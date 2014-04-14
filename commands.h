@@ -16,6 +16,9 @@
 #define IMG_NAME "_VIRTUAL_DISK_IMG"
 
 #define BLOCK_SIZE 4 * ONE_KB
+#define DISK_SIZE 100 * ONE_MB;
+#define BLOCK_COUNT 250000
+#define INODE_COUNT  20000
 
 
 typedef enum
@@ -24,28 +27,66 @@ typedef enum
  parseError,
  argError,
  ioError,
- exitError
+ exitError,
+ memError,
+ unInitError,
+ dupError,
 }
 usageErrorType;
 
-typedef struct
+typedef enum
 {
-void* directPtr[D_PTR_CNT];
-void* s_indirectPtr;
-void* d_indirectPtr;
-void* t_indirectPtr;
+	iNode_Empty = 0,
+	iNode_Dir,	
+	iNode_File,
+}
+iNode_Type;
+
+typedef struct
+{	
+	/*
+	iNode used for files and directorys. If it is for directory, the 1st 12 direct
+	pointer stores its sub-file or sub-directory. the s_indirectPtr stores its own 
+	iNode index, the d_indirectPtr stores its parent iNode index. The t_indirectPtr
+	will store the block index that contains more iNode indexes of sub-file or sub-
+	directory, if the nunber of children is more than 12
+	*/
+int directPtr[D_PTR_CNT]; 
+int s_indirectPtr;
+int d_indirectPtr;
+int t_indirectPtr;
 char fileName[LINE];
+int size;
+short offset; 
+iNode_Type type; 
 } iNode;
 
 typedef struct
 {
 int totalBlocks;
 int freeBlocks;
-iNode* firstNode;
+int totalINode;
+int freeINode;
 
-} superBlock;
+int bitMapOffset;
+int iNodeMapOffset;
+int iNodeOffset;
+} 
+superBlock;
 
 
+typedef struct
+{
+superBlock* sb;
+char* bitMapPointer;
+char* freeInodePointer;
+iNode* firstiNode;
+int currentDir;
+void* dataPointer;
+}
+GLOBAL_Pointers;
+
+usageErrorType Init_fs();
 usageErrorType Smkfs();
 usageErrorType Sopen(char* filename, char* flag);
 usageErrorType Sread(int fd, int size);
@@ -58,11 +99,16 @@ usageErrorType Slink(char* src, char* dest);
 usageErrorType Sunlink(char* name);
 usageErrorType Sstat(char* name);
 usageErrorType Sls();
+usageErrorType Scd(char* dirname);
 usageErrorType Scat(char* name);
 usageErrorType Scp(char* src, char* dest);
 usageErrorType Stree();
 usageErrorType Simport(char* srcname, char* destname);
 usageErrorType Sexport(char* srcname, char* destname);
 
-
 usageErrorType parseCommand(char* command);
+
+usageErrorType checkDuplicate(iNode* CD, char* dir);
+int get_free_iNode();
+usageErrorType sync_to_disk();
+void getAbsPath(iNode* cd);

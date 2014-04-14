@@ -11,12 +11,23 @@
 /*
  * 
  */
-int main(int argc, char** argv) {
+GLOBAL_Pointers* g_pointer;
+char path[LINE];
 
-    char path[LINE] = "/";
+int main(int argc, char** argv) 
+{
+    strcpy(path, "/");
     char command[LINE];
     
-    printf("Welcome to simulated file system!\nType HELP for help\n");
+    if (Init_fs() == unInitError)
+    {   
+    	printf("Alert! Disk not formated; Use mkfs to format first!\n");
+    }
+  	else
+  	{
+  		
+  		printf("Welcome to simulated file system!\nType HELP for help\n");
+  	}
 
     printf("$%s$>",path);        
     while (gets(command) != NULL)
@@ -100,6 +111,11 @@ usageErrorType parseCommand(char* command)
 		Smkdir(cmds[1]);
 	}
 	
+	if (strcmp(cmds[0], "cd") == 0)
+	{
+		Scd(cmds[1]);
+	}
+	
 	if (strcmp(cmds[0], "rmdir") == 0)
 	{
 		Srmdir(cmds[1]);
@@ -151,4 +167,38 @@ usageErrorType parseCommand(char* command)
 		
 	
 	return noError;
+}
+
+// initialize the file system
+usageErrorType Init_fs()
+{
+	int fd, i;
+	off_t rs;
+	
+	g_pointer = (GLOBAL_Pointers*)malloc(sizeof(GLOBAL_Pointers));
+	g_pointer->sb = (superBlock*)malloc(sizeof(superBlock));
+	
+	
+	fd = open(IMG_NAME, O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
+	
+	/* write the super block */
+	rs = read(fd, g_pointer->sb, sizeof(superBlock));
+	if (rs <= 0)
+	{	
+		close(fd);		
+		return unInitError;
+	}
+
+	g_pointer->bitMapPointer = (char*)malloc(g_pointer->sb->totalBlocks);
+	g_pointer->freeInodePointer = (char*)malloc(g_pointer->sb->totalINode);
+	g_pointer->firstiNode = (iNode*)malloc(g_pointer->sb->totalINode);
+
+	rs = read(fd, g_pointer->bitMapPointer, g_pointer->sb->totalBlocks);
+	rs = read(fd, g_pointer->freeInodePointer, g_pointer->sb->totalINode);
+	rs = read(fd, g_pointer->firstiNode, g_pointer->sb->totalINode);
+
+	g_pointer->currentDir = g_pointer->firstiNode->s_indirectPtr;
+
+	close(fd);
+	return noError;	
 }
