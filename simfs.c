@@ -52,6 +52,12 @@ usageErrorType parseCommand(char* command)
 	char* p;
 	int args = 0;
 	
+	// empty command
+	if (strcmp(command, "") == 0)
+	{
+		return noError;
+	}
+	
 	cmds[args++] = strtok(command, " ");
 	
 	while (args < ARGS)
@@ -61,13 +67,13 @@ usageErrorType parseCommand(char* command)
 		if (p != NULL)
 		{
 			cmds[args++] = p;
-			printf("cmds=%s #=%d\n", cmds[args-1], args);
-		}
+			// printf("cmds=%s #=%d\n", cmds[args-1], args);
+		}		
 		else
 		{
 			break;
 		}
-	}	 	
+	}
 	
 	if (strcmp(cmds[0], "exit") == 0)
 	{
@@ -79,91 +85,138 @@ usageErrorType parseCommand(char* command)
 	if (strcmp(cmds[0], "mkfs") == 0)
 	{
 		Smkfs();
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "open") == 0)
 	{
 		Sopen(cmds[1], cmds[2]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "read") == 0)
 	{
 		Sread(atoi(cmds[1]), atoi(cmds[2]));
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "write") == 0)
 	{
 		Swrite(atoi(cmds[1]), cmds[2]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "seek") == 0)
 	{
 		Sseek(atoi(cmds[1]), atoi(cmds[2]));
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "close") == 0)
 	{
 		Sclose(atoi(cmds[1]));
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "mkdir") == 0)
 	{
-		Smkdir(cmds[1]);
+		if (args < 2)
+		{
+			printf("mkdir: missing operand\n");
+		}
+		else
+		{
+			Smkdir(cmds[1]);
+		}
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "cd") == 0)
 	{
-		Scd(cmds[1]);
+		if (args < 2)
+		{
+			Scd("/");
+		}
+		else
+		{
+				Scd(cmds[1]);
+		}
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "rmdir") == 0)
 	{
 		Srmdir(cmds[1]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "link") == 0)
 	{
 		Slink(cmds[1], cmds[2]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "unlink") == 0)
 	{
 		Sunlink(cmds[1]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "stat") == 0)
 	{
 		Sstat(cmds[1]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "ls") == 0)
 	{
 		Sls();
+		return noError;
 	}
 	if (strcmp(cmds[0], "cat") == 0)
 	{
 		Scat(cmds[1]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "cp") == 0)
 	{
 		Scp(cmds[1], cmds[2]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "tree") == 0)
 	{
 		Stree();
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "import") == 0)
 	{
 		Simport(cmds[1], cmds[2]);
+		return noError;
 	}
 	
 	if (strcmp(cmds[0], "export") == 0)
 	{
 		Sexport(cmds[1], cmds[2]);
+		return noError;
 	}
+	if (strcmp(cmds[0], "debug") == 0)
+	{
+		int i;
+		char dir[LINE];
+		
+		for (i = 0; i < 12; i++)
+		{
+			sprintf(dir, "dir%ddir", i);
+			Smkdir(dir);			
+		}
+		
+		return noError;
+	}
+	
+	printf("simfs: command not found: %s\n", command);
 		
 	
 	return noError;
@@ -179,7 +232,7 @@ usageErrorType Init_fs()
 	g_pointer->sb = (superBlock*)malloc(sizeof(superBlock));
 	
 	
-	fd = open(IMG_NAME, O_RDWR | O_CREAT | O_APPEND, S_IRWXU);
+	fd = open(IMG_NAME, O_RDWR | O_CREAT, S_IRWXU);
 	
 	/* write the super block */
 	rs = read(fd, g_pointer->sb, sizeof(superBlock));

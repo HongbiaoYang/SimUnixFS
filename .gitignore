@@ -16,3 +16,7 @@
 *.exe
 *.out
 *.app
+
+#project related file
+_VIRTUAL_DISK_IM
+test/*

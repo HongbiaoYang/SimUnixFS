@@ -3,7 +3,7 @@ LD = gcc
 SRCS = $(wildcard *.c)
 OBJS = $(patsubst %c, %o, $(SRCS))
 TARGET = simfs
-CFLAGS = -g
+CFLAGS = -g -ggdb3
 
 #all:
 #	@echo $(SRCS)

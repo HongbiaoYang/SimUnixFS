@@ -11,15 +11,23 @@
 #define D_PTR_CNT 12
 
 #define ONE_KB 1024
-#define ONE_MB 1024*1024
+#define ONE_MB (1024*1024)
 #define COUNT_GB 4
 #define IMG_NAME "_VIRTUAL_DISK_IMG"
 
-#define BLOCK_SIZE 4 * ONE_KB
-#define DISK_SIZE 100 * ONE_MB;
+#define BLOCK_SIZE (4 * ONE_KB)
+#define DISK_SIZE (100 * ONE_MB);
 #define BLOCK_COUNT 250000
 #define INODE_COUNT  20000
+#define MAX_ENTRY_SIZE (ONE_KB+D_PTR_CNT)
 
+typedef enum
+{
+	FALSE = 0,
+	TRUE,
+}
+BOOL
+;
 
 typedef enum
 {
@@ -71,6 +79,7 @@ int freeINode;
 int bitMapOffset;
 int iNodeMapOffset;
 int iNodeOffset;
+int dataOffset;
 } 
 superBlock;
 
@@ -112,3 +121,12 @@ usageErrorType checkDuplicate(iNode* CD, char* dir);
 int get_free_iNode();
 usageErrorType sync_to_disk();
 void getAbsPath(iNode* cd);
+usageErrorType changeDirectory(iNode* entry);
+usageErrorType writeEntryInBlock(int blockIndex, int entryIndex, int freeNode);
+void PrintEntry(iNode* entry);
+void findSubEntries(int* array, iNode* CD);
+usageErrorType PrintTree(iNode* entry, int level);
+void PrintDash(int level);
+usageErrorType mkdir_unit(char* dirname);
+usageErrorType rmdir_unit(iNode* entry);
+iNode* findiNodeByName(char* name, iNode* CD);
