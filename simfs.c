@@ -90,31 +90,70 @@ usageErrorType parseCommand(char* command)
 	
 	if (strcmp(cmds[0], "open") == 0)
 	{
-		Sopen(cmds[1], cmds[2]);
+		if (args < 3)
+		{
+			printf("open: missing operand\n");
+		}
+		else
+		{
+			Sopen(cmds[1], cmds[2]);
+		}
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "read") == 0)
 	{
-		Sread(atoi(cmds[1]), atoi(cmds[2]));
+		if (args < 3)
+		{
+			printf("read: missing operand\n");
+		}
+		else
+		{
+			Sread(atoi(cmds[1]), atoi(cmds[2]));			
+		}		
+		
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "write") == 0)
 	{
-		Swrite(atoi(cmds[1]), cmds[2]);
+		if (args < 3)
+		{
+			printf("write: missing operand\n");
+		}
+		else
+		{
+				Swrite(atoi(cmds[1]), cmds[2]);
+		}						
+		
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "seek") == 0)
 	{
-		Sseek(atoi(cmds[1]), atoi(cmds[2]));
+		if (args < 3)
+		{
+			printf("seek: missing operand\n");
+		}
+		else
+		{
+			Sseek(atoi(cmds[1]), atoi(cmds[2]));
+		}				
+		
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "close") == 0)
-	{
-		Sclose(atoi(cmds[1]));
+	{		
+		if (args < 2)
+		{
+			printf("close: missing operand\n");
+		}
+		else
+		{
+				Sclose(atoi(cmds[1]));
+		}		
+		
 		return noError;
 	}
 	
@@ -146,25 +185,57 @@ usageErrorType parseCommand(char* command)
 	
 	if (strcmp(cmds[0], "rmdir") == 0)
 	{
-		Srmdir(cmds[1]);
+		if (args < 2)
+		{
+			printf("rmdir: missing operand\n");
+		}
+		else
+		{
+			Srmdir(cmds[1]);
+		}		
+		
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "link") == 0)
 	{
-		Slink(cmds[1], cmds[2]);
+		if (args < 3)
+		{
+			printf("link: missing operand\n");
+		}
+		else
+		{
+			Slink(cmds[1], cmds[2]);
+		}			
+		
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "unlink") == 0)
 	{
-		Sunlink(cmds[1]);
+		
+		if (args < 2)
+		{
+			printf("unlink: missing operand\n");
+		}
+		else
+		{
+			Sunlink(cmds[1]);
+		}			
+
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "stat") == 0)
 	{
-		Sstat(cmds[1]);
+		if (args < 2)
+		{
+			printf("stat: missing operand\n");
+		}
+		else
+		{
+				Sstat(cmds[1]);
+		}		
 		return noError;
 	}
 	
@@ -175,13 +246,29 @@ usageErrorType parseCommand(char* command)
 	}
 	if (strcmp(cmds[0], "cat") == 0)
 	{
-		Scat(cmds[1]);
+		if (args < 2)
+		{
+			printf("cat: missing operand\n");
+		}
+		else
+		{
+			Scat(cmds[1]);
+		}		
+
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "cp") == 0)
 	{
-		Scp(cmds[1], cmds[2]);
+		if (args < 3)
+		{
+			printf("cp: missing operand\n");
+		}
+		else
+		{
+			Scp(cmds[1], cmds[2]);
+		}		
+
 		return noError;
 	}
 	
@@ -228,7 +315,10 @@ usageErrorType Init_fs()
 	int fd, i;
 	off_t rs;
 	
+	// assign memory for the pointer of global pointers
 	g_pointer = (GLOBAL_Pointers*)malloc(sizeof(GLOBAL_Pointers));
+	
+	// assign memory for the superblock
 	g_pointer->sb = (superBlock*)malloc(sizeof(superBlock));
 	
 	
@@ -242,15 +332,24 @@ usageErrorType Init_fs()
 		return unInitError;
 	}
 
+	// assign memory for these global pointers 
 	g_pointer->bitMapPointer = (char*)malloc(g_pointer->sb->totalBlocks);
 	g_pointer->freeInodePointer = (char*)malloc(g_pointer->sb->totalINode);
-	g_pointer->firstiNode = (iNode*)malloc(g_pointer->sb->totalINode);
+	g_pointer->firstiNode = (iNode*)malloc(g_pointer->sb->totalINode * sizeof(iNode));
+	
 
+	// read value from bitmap, iNodemap, and iNodes into memory
 	rs = read(fd, g_pointer->bitMapPointer, g_pointer->sb->totalBlocks);
 	rs = read(fd, g_pointer->freeInodePointer, g_pointer->sb->totalINode);
 	rs = read(fd, g_pointer->firstiNode, g_pointer->sb->totalINode);
 
-	g_pointer->currentDir = g_pointer->firstiNode->s_indirectPtr;
+	//  initiate the current directory and the opened files
+	g_pointer->currentDir = g_pointer->firstiNode->selfIndex;
+	
+	g_pointer->openedFiles = (OpenedFile*)malloc(g_pointer->sb->maxOpenFile * sizeof(OpenedFile));
+	memset(g_pointer->openedFiles, 0, g_pointer->sb->maxOpenFile * sizeof(OpenedFile));
+	
+	g_pointer->openedFileCount = 0;
 
 	close(fd);
 	return noError;	

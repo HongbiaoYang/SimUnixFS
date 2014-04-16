@@ -20,6 +20,13 @@
 #define BLOCK_COUNT 250000
 #define INODE_COUNT  20000
 #define MAX_ENTRY_SIZE (ONE_KB+D_PTR_CNT)
+#define MAX_OPEN_FILE 	128
+#define BUFFER_SIZE (2 * ONE_KB)
+#define SYNC_SIZE ONE_KB
+#define INDEX_LENTH 4
+#define INDEX_IN_SIN (BLOCK_SIZE / INDEX_LENTH)
+#define INDEX_IN_DIN ((BLOCK_SIZE / INDEX_LENTH) * INDEX_IN_SIN)
+#define INDEX_IN_TIN ((BLOCK_SIZE / INDEX_LENTH) * INDEX_IN_DIN)
 
 typedef enum
 {
@@ -64,6 +71,8 @@ int s_indirectPtr;
 int d_indirectPtr;
 int t_indirectPtr;
 char fileName[LINE];
+int selfIndex;
+int parentIndex;
 int size;
 short offset; 
 iNode_Type type; 
@@ -80,9 +89,20 @@ int bitMapOffset;
 int iNodeMapOffset;
 int iNodeOffset;
 int dataOffset;
+
+int maxOpenFile;
 } 
 superBlock;
 
+typedef struct
+{
+	iNode* oNode;
+	int offset;
+	char* buf;
+	int bufUsed;
+	char flag;
+}
+OpenedFile;
 
 typedef struct
 {
@@ -92,6 +112,8 @@ char* freeInodePointer;
 iNode* firstiNode;
 int currentDir;
 void* dataPointer;
+OpenedFile* openedFiles;
+int openedFileCount;
 }
 GLOBAL_Pointers;
 
@@ -119,7 +141,9 @@ usageErrorType parseCommand(char* command);
 
 usageErrorType checkDuplicate(iNode* CD, char* dir);
 int get_free_iNode();
-usageErrorType sync_to_disk();
+int get_free_block();
+void free_block(int nBlock);
+usageErrorType sync_meta_to_disk();
 void getAbsPath(iNode* cd);
 usageErrorType changeDirectory(iNode* entry);
 usageErrorType writeEntryInBlock(int blockIndex, int entryIndex, int freeNode);
@@ -130,3 +154,19 @@ void PrintDash(int level);
 usageErrorType mkdir_unit(char* dirname);
 usageErrorType rmdir_unit(iNode* entry);
 iNode* findiNodeByName(char* name, iNode* CD);
+usageErrorType addSubEntry(iNode* CD, int freeNode);
+usageErrorType createFile(char* filename);
+int openFile(char* filename, char flag);
+int addOpenFile(iNode* entry, char flag);
+int checkOpened(iNode* entry);
+usageErrorType PrintStat(iNode* entry);
+usageErrorType sync_data_to_disk(OpenedFile* handler);
+int locateIndex(int offset, int index);
+int assignNewBlock(iNode* entry);
+usageErrorType	writeEntryInBlockSerial(int index, int offset, int data);
+usageErrorType writeWithinBlock(int cBlockIndex, int cOffset, OpenedFile* handler, int len);
+usageErrorType deleteOpenedFile(OpenedFile* handler);
+usageErrorType read_to_buffer(OpenedFile* handler, int size, char* buffer);
+usageErrorType load_bytes_from_block(int ablock, int offset, int actualBytes,
+																		 char* buffer, OpenedFile* handler);
+int do_open(char* namefilename, char* flag, BOOL checkOpen);
