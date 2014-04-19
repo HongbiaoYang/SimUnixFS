@@ -24,8 +24,7 @@ int main(int argc, char** argv)
     	printf("Alert! Disk not formated; Use mkfs to format first!\n");
     }
   	else
-  	{
-  		
+  	{  		
   		printf("Welcome to simulated file system!\nType HELP for help\n");
   	}
 
@@ -58,22 +57,23 @@ usageErrorType parseCommand(char* command)
 		return noError;
 	}
 	
-	cmds[args++] = strtok(command, " ");
-	
-	while (args < ARGS)
+	if (command[strlen(command) - 1] == '\n')
 	{
-		
-		p = strtok(NULL, " ");
-		if (p != NULL)
-		{
-			cmds[args++] = p;
-			// printf("cmds=%s #=%d\n", cmds[args-1], args);
-		}		
-		else
-		{
-			break;
-		}
+		command[strlen(command) - 1] = '\0';
 	}
+	
+	args = process_arguments(command, cmds);
+	
+	printf("==============command called: %s =====================\n", cmds[0]);
+
+	if (strcmp(cmds[0], "mkfs") != 0 &&
+		  g_pointer->sb->totalBlocks == 0 &&
+		  g_pointer->sb->totalINode == 0)
+  {
+  	printf("Alert! Disk not formated; Use mkfs to format first!\n");
+  	return unInitError;
+  }
+	
 	
 	if (strcmp(cmds[0], "exit") == 0)
 	{
@@ -280,13 +280,42 @@ usageErrorType parseCommand(char* command)
 	
 	if (strcmp(cmds[0], "import") == 0)
 	{
-		Simport(cmds[1], cmds[2]);
+		if (args < 3)
+		{
+			printf("import: missing operand\n");
+		}
+		else
+		{
+			Simport(cmds[1], cmds[2]);
+		}		
+
 		return noError;
 	}
 	
 	if (strcmp(cmds[0], "export") == 0)
 	{
-		Sexport(cmds[1], cmds[2]);
+		if (args < 3)
+		{
+			printf("export: missing operand\n");
+		}
+		else
+		{
+			Sexport(cmds[1], cmds[2]);
+		}		
+
+		return noError;
+	}
+	if (strcmp(cmds[0], "sh") == 0)
+	{
+		if (args < 2)
+		{
+			printf("sh: missing operand\n");
+		}
+		else
+		{
+			return batch_execute(cmds[1]);
+		}
+		
 		return noError;
 	}
 	if (strcmp(cmds[0], "debug") == 0)
@@ -302,6 +331,7 @@ usageErrorType parseCommand(char* command)
 		
 		return noError;
 	}
+
 	
 	printf("simfs: command not found: %s\n", command);
 		
@@ -345,6 +375,7 @@ usageErrorType Init_fs()
 
 	//  initiate the current directory and the opened files
 	g_pointer->currentDir = g_pointer->firstiNode->selfIndex;
+	g_pointer->curDirNode = g_pointer->firstiNode + g_pointer->currentDir; 
 	
 	g_pointer->openedFiles = (OpenedFile*)malloc(g_pointer->sb->maxOpenFile * sizeof(OpenedFile));
 	memset(g_pointer->openedFiles, 0, g_pointer->sb->maxOpenFile * sizeof(OpenedFile));
@@ -354,3 +385,82 @@ usageErrorType Init_fs()
 	close(fd);
 	return noError;	
 }
+
+int process_arguments(char* command, char** paras)
+{
+	int args, quote;
+	char *ptr1, *ptr2;
+	char buf[LINE] = {0};
+	
+	args = 0;
+	quote = 0;
+	ptr1 = command;
+	ptr2 = ptr1;
+	
+	while (*ptr2 != '\0')
+	{
+		
+		if (*ptr2 == ' ' && quote == 0)
+		{
+			// strncpy(buf, ptr1, ptr2 - ptr1);
+			// buf[ptr2 - ptr1] = 0;
+			paras[args++] = ptr1;
+			ptr1 = ptr2 + 1;		
+			while (*ptr1 == ' ')
+			{ 
+				ptr1++;
+			}			
+			
+		  *ptr2 = '\0';
+			ptr2 = ptr1;
+		}				
+
+		if (*ptr2 == '"' && quote == 0)
+		{
+			quote = 1;
+		}
+		else if (*ptr2 == '"' && quote == 1)
+		{
+			quote = 0;
+		}
+		
+		ptr2++;
+		
+	}
+	
+	if (*ptr1 != '\0')
+	{ 
+		paras[args++] = ptr1;
+		*ptr2 = '\0';
+	}
+	
+	return args;
+}
+
+
+usageErrorType batch_execute(char* script)
+{
+	FILE* fs;
+	char buf[LINE] = {0};
+	
+	fs = fopen(script, "r");
+	
+	if (fs == NULL)
+	{
+		perror("Error open script!");
+		return ioError;
+	}
+	
+	while (fgets(buf, LINE, fs) != NULL)
+	{
+		if (parseCommand(buf) == exitError)
+		{
+			return exitError;
+		}   
+	}
+	
+	return noError;
+	
+}
+
+

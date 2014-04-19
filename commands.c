@@ -5,8 +5,6 @@ extern char path[LINE];
 
 usageErrorType Smkfs()
 {
-	printf("mkfs called\n");
-	
 	int fd, i;
 	off_t rs;
 	
@@ -78,19 +76,32 @@ usageErrorType Sopen(char* filename, char* flag)
 	int openFd = do_open(filename, flag, TRUE);
 	if (openFd != -1)
 	{
-		printf("File: %s opened, fd = %d\n", filename, openFd);
+		printf("SUCCEES, File: %s opened, fd = %d\n", filename, openFd);
 	}
 }
 
 usageErrorType Sread(int fd, int size)
-{	
+{
+	char* buffer;
+	buffer = (char*)malloc(size + 1);
+	memset(buffer, 0, size + 1);
+	
+	do_read(fd, buffer, size);
+	printf("%s\n", buffer);
+	free(buffer);	
+	
+	return (noError);		
+}
+
+usageErrorType do_read(int fd, char* buffer, int size)
+{
 	OpenedFile* handler;
 	
 	// printf("fd = %d\n", fd);
 	
 	if (g_pointer->openedFiles[fd].oNode == NULL)
 	{
-		printf("No opened file found!\n");
+		printf("read: No opened file found!\n");
 		return argError;
 	}
 	else
@@ -116,14 +127,7 @@ usageErrorType Sread(int fd, int size)
 		return ioError;
 	}
 	
-	char* buffer;
-	buffer = (char*)malloc(size);
-	memset(buffer, 0, size);
-	
 	read_to_buffer(handler, size, buffer);
-	
-	printf("%s\n", buffer);
-	free(buffer);	
 	
 	return (noError);
 }
@@ -137,7 +141,7 @@ usageErrorType Swrite(int fd, char* buffer)
 	
 	if (g_pointer->openedFiles[fd].oNode == NULL)
 	{
-		printf("No opened file found!\n");
+		printf("write: No opened file found!\n");
 		return argError;
 	}
 	else
@@ -166,7 +170,27 @@ usageErrorType Swrite(int fd, char* buffer)
 
 usageErrorType Sseek(int fd, int offset)
 {
-	printf("seek called\n");
+	OpenedFile* handler;
+	
+	if (g_pointer->openedFiles[fd].oNode == NULL)
+	{
+		printf("seek: No opened file found!\n");
+		return argError;
+	}
+	else
+	{
+		handler = g_pointer->openedFiles + fd;
+	}
+	
+	if (offset < 0)
+	{
+		printf("seek: Illegal offset! %d\n", offset);
+		return argError;
+	}
+	
+	handler->offset = offset;
+	
+	
 	return (noError);
 }
 
@@ -195,25 +219,41 @@ usageErrorType Sclose(int fd)
 usageErrorType Scd(char* dirname)
 {
 	iNode *CD, *entry;
-	CD = g_pointer->firstiNode + g_pointer->currentDir;
+	CD = g_pointer->curDirNode;
 	int i, entrySize;	
+	char* sub;
 	
 	entrySize = CD->size;	
 	
-	entry = findiNodeByName(dirname, CD);
-	
-	if (entry == NULL)
+	if (strcmp(dirname, "/") == 0 ||
+		  strcmp(dirname, "") == 0)
 	{
-		printf("cd: No such file or directory:%s\n", dirname);	
-		return ioError;
+		return changeDirectory(g_pointer->firstiNode);
 	}
-	else if (entry->type != iNode_Dir)
+	else if ((sub = strchr(dirname, '/')) == NULL)
 	{
-		printf("cd: not a directory: %s\n", entry->fileName);
-		return ioError;
-	}
 	
-	return changeDirectory(entry);
+		entry = findiNodeByName(dirname, CD);
+		
+		if (entry == NULL)
+		{
+			printf("cd: No such file or directory:%s\n", dirname);	
+			return ioError;
+		}
+		else if (entry->type != iNode_Dir)
+		{
+			printf("cd: not a directory: %s\n", entry->fileName);
+			return ioError;
+		}
+		
+		return changeDirectory(entry);
+	}
+	else
+	{
+		*sub = '\0';
+		Scd(dirname);
+		Scd(sub + 1);
+	}
 }
 
 usageErrorType Smkdir(char* dirname)
@@ -232,7 +272,7 @@ usageErrorType Smkdir(char* dirname)
 		// the deepest child		
 			
 		// check if there is duplicated directory or file
-		iNode* CD = g_pointer->firstiNode + g_pointer->currentDir;
+		iNode* CD = g_pointer->curDirNode;
 		if (checkDuplicate(CD, dirname) == dupError)
 		{
 			printf("Fail: File or Directory Exist!\n");
@@ -251,29 +291,24 @@ usageErrorType Smkdir(char* dirname)
 		// with /, it means there are more sub folders
 		strncpy(tDir, dirname, sub - dirname);
 		
-		iNode* CD = g_pointer->firstiNode + g_pointer->currentDir;
+		iNode* CD = g_pointer->curDirNode;
 		if (checkDuplicate(CD, tDir) != dupError)
 		{
 			mkdir_unit(tDir);
 		}
-		else
-		{
-			printf("Fail: File or Directory Exist!\n");
-			return ioError;
-		}
-		
 		
 		Scd(tDir);
 		Smkdir(sub + 1);
 		Scd("..");
 	}	
 	
+	return noError;
 }
 
 
 usageErrorType Srmdir(char* dirname)
 {
-	iNode* CD = g_pointer->firstiNode + g_pointer->currentDir;
+	iNode* CD = g_pointer->curDirNode;
 	iNode* entry;
 	
 	entry = findiNodeByName(dirname, CD);
@@ -311,14 +346,63 @@ usageErrorType Srmdir(char* dirname)
 
 usageErrorType Slink(char* src, char* dest)
 {
-	printf("link called\n");
+	iNode *CD, *sEntry, *dEntry;
+	
+	CD = g_pointer->curDirNode;
+	
+	sEntry = findiNodeByName(src, CD);
+	if (sEntry == NULL)
+	{
+		printf("link: cannot create link '%s' to '%s': "\
+			 		 "No such file or directory\n", dest, src);	
+		return argError;
+	}
+	else if (sEntry->type == iNode_Dir)
+	{
+		printf("link: cannot create link '%s' to '%s': "\
+					 "Operation not permitted\n", dest, src);	
+		return argError;
+	}
+	
+	dEntry = findiNodeByName(dest, CD);
+	if (dEntry != NULL)
+	{
+		printf("link: cannot create link '%s' to '%s': "\
+					 "File exists", dest, src);	
+		return argError;
+	}
+	
+	do_copy(src, dest);
+		
 	return (noError);
 }
 
 
 usageErrorType Sunlink(char* name)
 {
-	printf("unlink called\n");
+	iNode *entry, *CD;
+	CD = g_pointer->curDirNode;
+	
+	entry = findiNodeByName(name, CD);
+	
+	if (entry == NULL)
+	{
+		printf("unlink: cannot unlink '%s': No such file or directory\n", name);
+		return argError;
+	}
+	else if (entry->type == iNode_Dir)
+	{
+		printf("unlink: cannot unlink '%s': Is a directory\n", name);
+		return argError;
+	}
+	
+	int blockCount = entry->size / BLOCK_SIZE + 1;
+	
+	releaseDataBlock(entry, blockCount);
+	
+	rmdir_unit(entry);	
+	sync_meta_to_disk();	
+	
 	return (noError);
 }
 
@@ -327,7 +411,7 @@ usageErrorType Sstat(char* name)
 {
 	
 	iNode *entry, *CD;
-	CD = g_pointer->firstiNode + g_pointer->currentDir;
+	CD = g_pointer->curDirNode;
 	
 	entry = findiNodeByName(name, CD);
 	if (entry == NULL)
@@ -347,7 +431,7 @@ usageErrorType Sls()
 {
 	
 	iNode *CD, *entry;
-	CD = g_pointer->firstiNode + g_pointer->currentDir;
+	CD = g_pointer->curDirNode;
 	int i, entrySize;	
 	
 	entrySize = CD->size;
@@ -374,7 +458,7 @@ usageErrorType Sls()
 usageErrorType Scat(char* name)
 {
 	iNode* CD;
-	CD = g_pointer->firstiNode + g_pointer->currentDir;
+	CD = g_pointer->curDirNode;
 	
 	iNode* entry = findiNodeByName(name, CD);
 	if (entry == NULL)
@@ -388,10 +472,13 @@ usageErrorType Scat(char* name)
 		return ioError;
 	}
 	
-	// read the whole file
-	int fd = do_open(name, "r", FALSE);
-	Sread(fd, entry->size);
-	Sclose(fd);
+	// read the whole file	
+	if (entry->size > 0)
+	{
+		int fd = do_open(name, "r", FALSE);
+		Sread(fd, entry->size);
+		Sclose(fd);
+	}
 	
 	return (noError);
 }
@@ -399,7 +486,42 @@ usageErrorType Scat(char* name)
 
 usageErrorType Scp(char* src, char* dest)
 {
-	printf("cp called\n");
+	iNode *CD, *sEntry, *dEntry;
+	CD = g_pointer->curDirNode;
+	
+	sEntry = findiNodeByName(src, CD);
+	if (sEntry == NULL)
+	{
+		printf("cp: %s: No such file or directory\n", src);
+		return ioError;
+	}
+	else if (sEntry->type == iNode_Dir)
+	{
+		printf("cp: %s: Is a directory\n", src);
+		return ioError;
+	}
+	
+	dEntry = findiNodeByName(dest, CD);
+	if (dEntry != NULL)
+	{
+		if (dEntry->type == iNode_Dir)
+		{
+			changeDirectory(dEntry);
+			do_copy_from_entry(sEntry, src);
+			changeDirectory(CD);
+		}
+		else if (dEntry->type == iNode_File)
+		{
+			Sunlink(dest);
+			do_copy(src, dest);
+		}
+	}
+	else 
+	{
+		do_copy(src, dest);
+	}
+	
+
 	return (noError);
 }
 
@@ -416,15 +538,85 @@ usageErrorType Stree()
 
 usageErrorType Simport(char* srcname, char* destname)
 {
-	printf("import called\n");
+	int ifd, efd, rs;	
+	iNode* dEntry;
+	char buf[BUFFER_SIZE] = {0};
+	
+	dEntry = findiNodeByName(destname, g_pointer->curDirNode);
+	
+	// check if the dest file already exist
+	if (dEntry != NULL)
+	{
+		printf("import: File already exist!\n");
+		return ioError;
+	}
+	
+	// check if the source file open fail
+	ifd = open(srcname, O_RDONLY, S_IRWXU);
+	if (ifd == -1)
+	{
+		perror("Fail open file!\n");
+		return ioError;
+	}
+	
+	// open and create dest file. Don't have to check if opened
+	efd = do_open(destname, "w", FALSE);
+	
+	while ((rs = read(ifd, buf, BUFFER_SIZE)) > 0)
+	{
+		Swrite(efd, buf);
+		memset(buf, 0, BUFFER_SIZE);
+	}
+	
+	// close both file
+	close(ifd);
+	Sclose(efd);
+	
+	
 	return (noError);
 }
 
 
 usageErrorType Sexport(char* srcname, char* destname)
 {
-	printf("mkfs called\n");
+	int efd, ifd, fsize, rs;
+	iNode *sEntry, *dEntry;
+	char* buffer;
+	
+	sEntry = findiNodeByName(srcname, g_pointer->curDirNode);
+	
+	// check if no source file found
+	if (sEntry == NULL)
+	{
+		printf("export: No file found!\n");
+		return ioError;
+	}
+	
+	// check if the dest file open fail
+	efd = open(destname, O_WRONLY | O_TRUNC | O_CREAT, S_IRWXU);
+	if (efd == -1)
+	{
+		perror("Fail open file!\n");
+		return ioError;
+	}
+	
+	// open and create src file. Don't have to check if opened
+	ifd = do_open(srcname, "r", FALSE);
+	
+	fsize = sEntry->size;
+	buffer = (char*) malloc(fsize);
+	memset(buffer, 0, fsize);
+	
+	do_read(ifd, buffer, fsize);
+	
+	rs = write(efd, buffer, fsize);
+	
+	// close both file
+	close(efd);
+	Sclose(ifd);
+	
 	return (noError);
+
 }
 
 // check if there exists a duplicated file or directory
@@ -507,7 +699,7 @@ int get_free_iNode()
 	return -1;	
 }
 
-
+ 
 int get_free_block()
 {
 	int i;
@@ -539,7 +731,7 @@ usageErrorType writeEntryInBlock(int blockIndex, int entryIndex, int freeNode)
 	fd = open(IMG_NAME, O_RDWR, S_IRWXU);
 	lseek(fd, g_pointer->sb->dataOffset + BLOCK_SIZE * blockIndex, SEEK_SET);
 	
-	int indexBuf[BLOCK_SIZE / INDEX_LENTH] = {0};
+	int indexBuf[BLOCK_SIZE / INDEX_LENGTH] = {0};
 	
 	if (entryIndex == 0)
 	{
@@ -548,7 +740,8 @@ usageErrorType writeEntryInBlock(int blockIndex, int entryIndex, int freeNode)
 	else
 	{		
 		read(fd, indexBuf, BLOCK_SIZE);
-		for (i = 1; i < BLOCK_SIZE; i++)
+		
+		for (i = 1; i < BLOCK_SIZE /INDEX_LENGTH ; i++)
 		{
 			if (indexBuf[i] == 0)
 			{
@@ -557,9 +750,12 @@ usageErrorType writeEntryInBlock(int blockIndex, int entryIndex, int freeNode)
 			}				
 		}
 		
-		printf("Entry number exceed maxima!\n");
-		close(fd);
-		return ioError;
+		if (i  == BLOCK_SIZE /INDEX_LENGTH)
+		{
+			printf("Entry number exceed maxima!\n");
+			close(fd);
+			return ioError;
+		}
 	}
 	
 	// back to the start of the block
@@ -576,9 +772,9 @@ usageErrorType	writeEntryInBlockSerial(int index, int offset, int data)
 	int i, fd, rs;
 	
 	fd = open(IMG_NAME, O_WRONLY, S_IRWXU);
-	lseek(fd, g_pointer->sb->dataOffset + BLOCK_SIZE * index + offset * INDEX_LENTH, SEEK_SET);
+	lseek(fd, g_pointer->sb->dataOffset + BLOCK_SIZE * index + offset * INDEX_LENGTH, SEEK_SET);
 	
-	rs = write(fd, &data, INDEX_LENTH);
+	rs = write(fd, &data, INDEX_LENGTH);
 	close(fd);
 	
 	return noError;
@@ -625,6 +821,7 @@ void getAbsPath(iNode* cd)
 usageErrorType changeDirectory(iNode* entry)
 {
 	g_pointer->currentDir = entry->selfIndex;
+	g_pointer->curDirNode = g_pointer->firstiNode + g_pointer->currentDir;
 	memset(path, 0, LINE);
 	getAbsPath(entry);
 	return noError;
@@ -675,10 +872,10 @@ void findSubEntries(int* array, iNode* CD)
 		fd = open(IMG_NAME, O_RDONLY, S_IRWXU);
 		lseek(fd, g_pointer->sb->dataOffset + BLOCK_SIZE * CD->t_indirectPtr, SEEK_SET);
 	
-		int indexBuf[BLOCK_SIZE / INDEX_LENTH] = {0};
+		int indexBuf[BLOCK_SIZE / INDEX_LENGTH] = {0};
 		rs = read(fd, indexBuf, BLOCK_SIZE);
 		
-		for (i = 0; i < BLOCK_SIZE / INDEX_LENTH; i++)
+		for (i = 0; i < BLOCK_SIZE / INDEX_LENGTH; i++)
 		{
 			if (indexBuf[i] == 0)
 			{
@@ -763,7 +960,7 @@ usageErrorType mkdir_unit(char* inputDir)
 	}
 	
 	// get the current directory iNode
-	iNode* CD = g_pointer->firstiNode + g_pointer->currentDir;
+	iNode* CD = g_pointer->curDirNode;
 	int i, firstAvailPoint, entrySize, blockIndex4Entry;
 	
 	entrySize = CD->size;
@@ -883,10 +1080,10 @@ usageErrorType rmdir_unit(iNode* entry)
 		fd = open(IMG_NAME, O_RDWR, S_IRWXU);
 		lseek(fd, g_pointer->sb->dataOffset + BLOCK_SIZE * parent->t_indirectPtr, SEEK_SET);
 	
-		int indexBuf[BLOCK_SIZE / INDEX_LENTH] = {0};
+		int indexBuf[BLOCK_SIZE / INDEX_LENGTH] = {0};
 		rs = read(fd, indexBuf, BLOCK_SIZE);
 		
-		for (i = 0; i < BLOCK_SIZE / INDEX_LENTH; i++)
+		for (i = 0; i < BLOCK_SIZE / INDEX_LENGTH; i++)
 		{
 			if (indexBuf[i] == 0)
 			{
@@ -937,7 +1134,7 @@ usageErrorType createFile(char* filename)
 	int entrySize, freeNode, firstAvailPoint;
 	iNode *CD, *entry;
 	
-	CD = g_pointer->firstiNode + g_pointer->currentDir;	
+	CD = g_pointer->curDirNode;
 	entrySize = CD->size;
 	
 	freeNode = get_free_iNode();
@@ -954,6 +1151,16 @@ usageErrorType createFile(char* filename)
 	entry->size = 0;
 	strcpy(entry->fileName, filename);
 	entry->offset = 0;
+	entry->link = 1;
+	
+	// assign a new block as data block
+	int block4Data = get_free_block();
+	if (block4Data == -1)
+	{
+		printf("Not Enough free Block available!\n");
+		return -1;
+	}	
+	entry->directPtr[0] = block4Data;
 	
 	
 	addSubEntry(CD, freeNode);
@@ -1021,7 +1228,7 @@ int openFile(char* filename, char flag)
 	iNode *CD, *entry;
 	int fd;
 
-	CD = g_pointer->firstiNode + g_pointer->currentDir;
+	CD = g_pointer->curDirNode;
 	
 	
 	entry = findiNodeByName(filename, CD);
@@ -1047,8 +1254,8 @@ int addOpenFile(iNode* entry, char flag)
 			// if the file was opened with 'r', offset is at the begining;
 			// otherwise, the offset is at the end
 			g_pointer->openedFiles[i].offset = flag == 'r' ? 0 : entry->size;
-			g_pointer->openedFiles[i].buf = (char*)malloc(BUFFER_SIZE);
-			memset(g_pointer->openedFiles[i].buf, 0, BUFFER_SIZE);
+			g_pointer->openedFiles[i].buf = (char*)malloc(BUFFER_SIZE + 1);
+			memset(g_pointer->openedFiles[i].buf, 0, BUFFER_SIZE + 1);
 			g_pointer->openedFiles[i].bufUsed = 0;
 			g_pointer->openedFiles[i].flag = flag;
 			g_pointer->openedFileCount ++;
@@ -1133,15 +1340,20 @@ usageErrorType sync_data_to_disk(OpenedFile* handler)
 	int fsize, cBlock, cOffset, cBlockIndex, nBlockIndex;
 
 	fsize = handler->oNode->size;
-	cBlock = fsize % BLOCK_SIZE;
+	cBlock = fsize / BLOCK_SIZE;
 	cOffset = fsize - BLOCK_SIZE * cBlock;
 	
 	cBlockIndex = calcBlockIndex(cBlock, handler->oNode);	
 	
-	if (handler->bufUsed <= BLOCK_SIZE - cOffset)
+	if (handler->bufUsed < BLOCK_SIZE - cOffset)
 	{
 		// all bytes can be written within this same block
 		writeWithinBlock(cBlockIndex, cOffset, handler, handler->bufUsed);
+	}
+	else if (handler->bufUsed == BLOCK_SIZE - cOffset)
+	{
+		writeWithinBlock(cBlockIndex, cOffset, handler, handler->bufUsed);
+		nBlockIndex = assignNewBlock(handler->oNode);
 	}
 	else
 	{
@@ -1154,6 +1366,9 @@ usageErrorType sync_data_to_disk(OpenedFile* handler)
 		nBlockIndex = assignNewBlock(handler->oNode);		
 		writeWithinBlock(nBlockIndex, 0, handler, handler->bufUsed - (BLOCK_SIZE - cOffset));
 	}
+
+	memset(handler->buf, 0, BUFFER_SIZE);
+	handler->bufUsed = 0;
 
 	return noError;	
 }
@@ -1203,8 +1418,8 @@ int locateIndex(int offset, int index)
 {
 	int buf4Index = -1;
 	int fd = open(IMG_NAME, O_RDONLY, S_IRWXU);
-	lseek(fd, g_pointer->sb->dataOffset + index * BLOCK_SIZE + offset * INDEX_LENTH, SEEK_SET);
-	read(fd, &buf4Index, INDEX_LENTH);
+	lseek(fd, g_pointer->sb->dataOffset + index * BLOCK_SIZE + offset * INDEX_LENGTH, SEEK_SET);
+	read(fd, &buf4Index, INDEX_LENGTH);
 	
 	close(fd);
 	
@@ -1217,11 +1432,13 @@ int locateIndex(int offset, int index)
 // comments: depending on the file size, 1 ~ 3 assign-block operation might occur
 int assignNewBlock(iNode* entry)
 {
+	/*
 	if (entry->size < BLOCK_SIZE)
 	{
 		printf("Don't need to assign extra block!\n");
 		return -1;
 	}
+	*/
 	
 	// assign a new block as data block
 	int block4Data = get_free_block();
@@ -1339,13 +1556,13 @@ usageErrorType load_bytes_from_block(int ablock, int offset, int actualBytes,
 																		 char* buffer, OpenedFile* handler)
 {
 	int fd, rs;
-	char newBytes[BLOCK_SIZE] = {0};
+	char newBytes[BLOCK_SIZE + 1] = {0};
 	
 	fd = open(IMG_NAME, O_RDONLY, S_IRWXU);
 	lseek(fd, g_pointer->sb->dataOffset + ablock * BLOCK_SIZE + offset, SEEK_SET);
 	rs = read(fd, newBytes, actualBytes);
 	
-	strcat(buffer, newBytes);
+	strncat(buffer, newBytes, rs);
 	handler->offset += actualBytes;
 	
 	close(fd);
@@ -1359,11 +1576,11 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 	if (strlen(flag) > 1 || (*flag != 'r' && *flag != 'w'))
 	{
 		printf("Open flag error! Please use 'r' or 'w' only!\n");
-		return argError;
+		return -1;
 	}
 	
 	iNode *CD, *entry;
-	CD = g_pointer->firstiNode + g_pointer->currentDir;
+	CD = g_pointer->curDirNode;
 	int openFd;
 	
 	entry = findiNodeByName(filename, CD);
@@ -1381,7 +1598,7 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 	else if (checkOpen  && (openFd = checkOpened(entry)) != -1)
 	{
 		printf("File already opened, fd = %d\n", openFd);
-		return noError;
+		return -1;
 	}
 	else
 	{
@@ -1394,4 +1611,93 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 	}
 		
 	return (openFd);
+}
+
+usageErrorType releaseDataBlock(iNode* entry, int blockCount)
+{
+	int i, ablock;	
+
+	for (i = 0; i < blockCount; i++)
+	{
+		
+		ablock = calcBlockIndex(i, entry);
+		g_pointer->bitMapPointer[ablock] = 0;
+		g_pointer->sb->freeBlocks ++;
+	}
+	
+	return noError;
+	
+}
+
+// copy file : create an empty file, and copy all block of data into this 
+// created dest file
+// input: the iNode of the source file, the name of the dest file
+// command: the dest file need to be created first, so no iNode is 
+//          available at first
+usageErrorType do_copy_from_entry(iNode* sEntry, char* dest)
+{
+	iNode *dEntry, *CD;
+	int rblock, sblock, dblock, i, fd;
+	
+	CD = g_pointer->curDirNode;
+	
+	// create the destination file
+	createFile(dest);
+	dEntry = findiNodeByName(dest, CD);
+	
+	// block size
+	rblock = sEntry->size / BLOCK_SIZE;
+	if (sEntry->size % BLOCK_SIZE != 0)
+	{
+		rblock += 1;
+	}
+	
+	fd = open(IMG_NAME, O_RDWR, S_IRWXU);
+	
+	// copy the first block
+	copy_data_via_block(fd, sEntry->directPtr[0], dEntry->directPtr[0]);
+	
+	// copy the rest of the block
+	for (i = 1; i < rblock; i++)
+	{
+		sblock = calcBlockIndex(i, sEntry);
+		
+		dblock = assignNewBlock(dEntry);
+		
+		copy_data_via_block(fd, sblock, dblock);		
+	}
+	
+	dEntry->size = sEntry->size;
+	
+	close(fd);
+}
+
+// wrapper of the do_copy_from_entry() function
+// the only difference is: the source file is the file name instead of iNode
+// input: file name of the source, file name of the dest
+// output: no
+usageErrorType do_copy(char* src, char* dest)
+{
+	iNode *CD, *sEntry;
+	CD = g_pointer->curDirNode;
+
+	sEntry = findiNodeByName(src, CD);
+
+	// call the inner function
+	do_copy_from_entry(sEntry, dest);
+}
+
+
+usageErrorType copy_data_via_block(int fd, int sblock, int dblock)
+{
+	int rs;
+	char buf[BLOCK_SIZE] = {0};
+	
+	lseek(fd, g_pointer->sb->dataOffset + sblock * BLOCK_SIZE, SEEK_SET);
+	rs = read(fd, buf, BLOCK_SIZE);
+	
+	lseek(fd, g_pointer->sb->dataOffset + dblock * BLOCK_SIZE, SEEK_SET);
+	rs = write(fd, buf, BLOCK_SIZE);
+	
+	return noError;
 }
