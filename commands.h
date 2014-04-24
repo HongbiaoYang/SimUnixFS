@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #define ARGS 3
 #define LINE 128
@@ -117,6 +118,9 @@ iNode* curDirNode;
 }
 GLOBAL_Pointers;
 
+FILE* outputStream;
+BOOL  outputFlag;
+
 usageErrorType Init_fs();
 usageErrorType Smkfs();
 usageErrorType Sopen(char* filename, char* flag);
@@ -177,3 +181,5 @@ usageErrorType releaseDataBlock(iNode* entry, int blockCount);
 usageErrorType do_copy(char* src, char* dest);
 usageErrorType do_copy_from_entry(iNode* sEntry, char* dest);
 usageErrorType copy_data_via_block(int fd, int sblock, int dblock);
+usageErrorType batch_execute_output(char* script, char* output);
+void PrintOutPut(const char *format, ...);

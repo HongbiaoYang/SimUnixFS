@@ -23,4 +23,5 @@ clean:
 	rm -rf *.o $(TARGET) _VIRTUAL_DISK_IMG
 test:
 	./simfs
+release:
 

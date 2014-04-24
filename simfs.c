@@ -13,6 +13,8 @@
  */
 GLOBAL_Pointers* g_pointer;
 char path[LINE];
+FILE* outputStream;
+BOOL  outputFlag;
 
 int main(int argc, char** argv) 
 {
@@ -21,14 +23,14 @@ int main(int argc, char** argv)
     
     if (Init_fs() == unInitError)
     {   
-    	printf("Alert! Disk not formated; Use mkfs to format first!\n");
+    	PrintOutPut("Alert! Disk not formated; Use mkfs to format first!\n");
     }
   	else
   	{  		
-  		printf("Welcome to simulated file system!\nType HELP for help\n");
+  		PrintOutPut("Welcome to simulated file system!\nType HELP for help\n");
   	}
 
-    printf("$%s$>",path);        
+    PrintOutPut("$%s$>",path);        
     while (gets(command) != NULL)
     {
     	if (parseCommand(command) == exitError)
@@ -36,8 +38,8 @@ int main(int argc, char** argv)
   			break;
   		}    	
     	
-			// printf("%s\n", command);
-			printf("$%s$>",path);        
+			// PrintOutPut("%s\n", command);
+			PrintOutPut("$%s$>",path);        
         
     }
     
@@ -64,20 +66,20 @@ usageErrorType parseCommand(char* command)
 	
 	args = process_arguments(command, cmds);
 	
-	printf("==============command called: %s =====================\n", cmds[0]);
+	PrintOutPut("==============command called: %s =====================\n", cmds[0]);
 
 	if (strcmp(cmds[0], "mkfs") != 0 &&
 		  g_pointer->sb->totalBlocks == 0 &&
 		  g_pointer->sb->totalINode == 0)
   {
-  	printf("Alert! Disk not formated; Use mkfs to format first!\n");
+  	PrintOutPut("Alert! Disk not formated; Use mkfs to format first!\n");
   	return unInitError;
   }
 	
 	
 	if (strcmp(cmds[0], "exit") == 0)
 	{
-		printf("Thanks, Bye!\n");
+		PrintOutPut("Thanks, Bye!\n");
 		return (exitError);
 	}
 	
@@ -92,7 +94,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("open: missing operand\n");
+			PrintOutPut("open: missing operand\n");
 		}
 		else
 		{
@@ -105,7 +107,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("read: missing operand\n");
+			PrintOutPut("read: missing operand\n");
 		}
 		else
 		{
@@ -119,11 +121,12 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("write: missing operand\n");
+			PrintOutPut("write: missing operand\n");
 		}
 		else
 		{
 				Swrite(atoi(cmds[1]), cmds[2]);
+				Swrite(atoi(cmds[1]), "\n");
 		}						
 		
 		return noError;
@@ -133,7 +136,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("seek: missing operand\n");
+			PrintOutPut("seek: missing operand\n");
 		}
 		else
 		{
@@ -147,7 +150,7 @@ usageErrorType parseCommand(char* command)
 	{		
 		if (args < 2)
 		{
-			printf("close: missing operand\n");
+			PrintOutPut("close: missing operand\n");
 		}
 		else
 		{
@@ -161,7 +164,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 2)
 		{
-			printf("mkdir: missing operand\n");
+			PrintOutPut("mkdir: missing operand\n");
 		}
 		else
 		{
@@ -187,7 +190,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 2)
 		{
-			printf("rmdir: missing operand\n");
+			PrintOutPut("rmdir: missing operand\n");
 		}
 		else
 		{
@@ -201,7 +204,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("link: missing operand\n");
+			PrintOutPut("link: missing operand\n");
 		}
 		else
 		{
@@ -216,7 +219,7 @@ usageErrorType parseCommand(char* command)
 		
 		if (args < 2)
 		{
-			printf("unlink: missing operand\n");
+			PrintOutPut("unlink: missing operand\n");
 		}
 		else
 		{
@@ -230,7 +233,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 2)
 		{
-			printf("stat: missing operand\n");
+			PrintOutPut("stat: missing operand\n");
 		}
 		else
 		{
@@ -248,7 +251,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 2)
 		{
-			printf("cat: missing operand\n");
+			PrintOutPut("cat: missing operand\n");
 		}
 		else
 		{
@@ -262,7 +265,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("cp: missing operand\n");
+			PrintOutPut("cp: missing operand\n");
 		}
 		else
 		{
@@ -282,7 +285,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("import: missing operand\n");
+			PrintOutPut("import: missing operand\n");
 		}
 		else
 		{
@@ -296,7 +299,7 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 3)
 		{
-			printf("export: missing operand\n");
+			PrintOutPut("export: missing operand\n");
 		}
 		else
 		{
@@ -309,11 +312,15 @@ usageErrorType parseCommand(char* command)
 	{
 		if (args < 2)
 		{
-			printf("sh: missing operand\n");
+			PrintOutPut("sh: missing operand\n");
 		}
-		else
+		else if (args == 2)
 		{
 			return batch_execute(cmds[1]);
+		}
+		else if (args == 3)
+		{
+			return batch_execute_output(cmds[1], cmds[2]);
 		}
 		
 		return noError;
@@ -333,7 +340,7 @@ usageErrorType parseCommand(char* command)
 	}
 
 	
-	printf("simfs: command not found: %s\n", command);
+	PrintOutPut("simfs: command not found: %s\n", command);
 		
 	
 	return noError;
@@ -464,3 +471,16 @@ usageErrorType batch_execute(char* script)
 }
 
 
+usageErrorType batch_execute_output(char* script, char* output)
+{
+	outputStream = fopen(output, "a+");
+	outputFlag = TRUE;
+	
+	usageErrorType ret;
+	ret = batch_execute(script);
+	
+	fclose(outputStream);
+	outputFlag = FALSE;
+	
+	return ret;	
+}

@@ -2,6 +2,8 @@
 
 extern  GLOBAL_Pointers* g_pointer;
 extern char path[LINE];
+extern  FILE* outputStream;
+extern  BOOL  outputFlag;
 
 usageErrorType Smkfs()
 {
@@ -76,7 +78,7 @@ usageErrorType Sopen(char* filename, char* flag)
 	int openFd = do_open(filename, flag, TRUE);
 	if (openFd != -1)
 	{
-		printf("SUCCEES, File: %s opened, fd = %d\n", filename, openFd);
+		PrintOutPut("SUCCEES, File: %s opened, fd = %d\n", filename, openFd);
 	}
 }
 
@@ -87,7 +89,7 @@ usageErrorType Sread(int fd, int size)
 	memset(buffer, 0, size + 1);
 	
 	do_read(fd, buffer, size);
-	printf("%s\n", buffer);
+	PrintOutPut("%s\n", buffer);
 	free(buffer);	
 	
 	return (noError);		
@@ -97,11 +99,9 @@ usageErrorType do_read(int fd, char* buffer, int size)
 {
 	OpenedFile* handler;
 	
-	// printf("fd = %d\n", fd);
-	
 	if (g_pointer->openedFiles[fd].oNode == NULL)
 	{
-		printf("read: No opened file found!\n");
+		PrintOutPut("read: No opened file found!\n");
 		return argError;
 	}
 	else
@@ -111,19 +111,19 @@ usageErrorType do_read(int fd, char* buffer, int size)
 	
 	if (handler->flag != 'r')
 	{
-		printf("Read failed! The file is write only!\n");
+		PrintOutPut("Read failed! The file is write only!\n");
 		return ioError;
 	}
 	
 	if (size <= 0)
 	{
-		printf("Illegal read bytes:%d\n", size);
+		PrintOutPut("Illegal read bytes:%d\n", size);
 		return argError;
 	}
 	
 	if (handler->offset >= handler->oNode->size)
 	{
-		printf("Read: end of file reached!\n");
+		PrintOutPut("Read: end of file reached!\n");
 		return ioError;
 	}
 	
@@ -136,12 +136,10 @@ usageErrorType do_read(int fd, char* buffer, int size)
 usageErrorType Swrite(int fd, char* buffer)
 {
 	OpenedFile* handler;
-	
-	// printf("fd = %d\n", fd);
-	
+
 	if (g_pointer->openedFiles[fd].oNode == NULL)
 	{
-		printf("write: No opened file found!\n");
+		PrintOutPut("write: No opened file found!\n");
 		return argError;
 	}
 	else
@@ -151,7 +149,7 @@ usageErrorType Swrite(int fd, char* buffer)
 	
 	if (handler->flag != 'w')
 	{
-		printf("Write failed! The file is read only!\n");
+		PrintOutPut("Write failed! The file is read only!\n");
 		return ioError;
 	}
 
@@ -174,7 +172,7 @@ usageErrorType Sseek(int fd, int offset)
 	
 	if (g_pointer->openedFiles[fd].oNode == NULL)
 	{
-		printf("seek: No opened file found!\n");
+		PrintOutPut("seek: No opened file found!\n");
 		return argError;
 	}
 	else
@@ -184,7 +182,7 @@ usageErrorType Sseek(int fd, int offset)
 	
 	if (offset < 0)
 	{
-		printf("seek: Illegal offset! %d\n", offset);
+		PrintOutPut("seek: Illegal offset! %d\n", offset);
 		return argError;
 	}
 	
@@ -199,7 +197,7 @@ usageErrorType Sclose(int fd)
 {	
 	if (g_pointer->openedFiles[fd].oNode == NULL)
 	{
-		printf("No such file opened!\n");
+		PrintOutPut("No such file opened!\n");
 		return ioError;
 	}
 	else
@@ -237,12 +235,12 @@ usageErrorType Scd(char* dirname)
 		
 		if (entry == NULL)
 		{
-			printf("cd: No such file or directory:%s\n", dirname);	
+			PrintOutPut("cd: No such file or directory:%s\n", dirname);	
 			return ioError;
 		}
 		else if (entry->type != iNode_Dir)
 		{
-			printf("cd: not a directory: %s\n", entry->fileName);
+			PrintOutPut("cd: not a directory: %s\n", entry->fileName);
 			return ioError;
 		}
 		
@@ -275,7 +273,7 @@ usageErrorType Smkdir(char* dirname)
 		iNode* CD = g_pointer->curDirNode;
 		if (checkDuplicate(CD, dirname) == dupError)
 		{
-			printf("Fail: File or Directory Exist!\n");
+			PrintOutPut("Fail: File or Directory Exist!\n");
 			return dupError;
 		}	
 	
@@ -315,24 +313,24 @@ usageErrorType Srmdir(char* dirname)
 	if (entry == NULL)
 	{
 		
-		printf("rmdir: failed to remove '%s': No such file or directory\n", dirname);
+		PrintOutPut("rmdir: failed to remove '%s': No such file or directory\n", dirname);
 		return ioError;
 	}
 	else if (entry->type == iNode_File)
 	{
-		printf("rmdir: failed to remove '%s': Not a directory\n", dirname);
+		PrintOutPut("rmdir: failed to remove '%s': Not a directory\n", dirname);
 		return ioError;
 	}
 	else if (entry->size > 0)
 	{
-		printf("rmdir: failed to remove '%s': Directory not empty\n", dirname);
+		PrintOutPut("rmdir: failed to remove '%s': Directory not empty\n", dirname);
 		return ioError;
 	}
 	else
 	{
 		if (rmdir_unit(entry) == ioError)
 		{
-			printf("Error removing directory!\n");
+			PrintOutPut("Error removing directory!\n");
 			return ioError;
 		}
 		
@@ -353,13 +351,13 @@ usageErrorType Slink(char* src, char* dest)
 	sEntry = findiNodeByName(src, CD);
 	if (sEntry == NULL)
 	{
-		printf("link: cannot create link '%s' to '%s': "\
+		PrintOutPut("link: cannot create link '%s' to '%s': "\
 			 		 "No such file or directory\n", dest, src);	
 		return argError;
 	}
 	else if (sEntry->type == iNode_Dir)
 	{
-		printf("link: cannot create link '%s' to '%s': "\
+		PrintOutPut("link: cannot create link '%s' to '%s': "\
 					 "Operation not permitted\n", dest, src);	
 		return argError;
 	}
@@ -367,7 +365,7 @@ usageErrorType Slink(char* src, char* dest)
 	dEntry = findiNodeByName(dest, CD);
 	if (dEntry != NULL)
 	{
-		printf("link: cannot create link '%s' to '%s': "\
+		PrintOutPut("link: cannot create link '%s' to '%s': "\
 					 "File exists", dest, src);	
 		return argError;
 	}
@@ -387,12 +385,12 @@ usageErrorType Sunlink(char* name)
 	
 	if (entry == NULL)
 	{
-		printf("unlink: cannot unlink '%s': No such file or directory\n", name);
+		PrintOutPut("unlink: cannot unlink '%s': No such file or directory\n", name);
 		return argError;
 	}
 	else if (entry->type == iNode_Dir)
 	{
-		printf("unlink: cannot unlink '%s': Is a directory\n", name);
+		PrintOutPut("unlink: cannot unlink '%s': Is a directory\n", name);
 		return argError;
 	}
 	
@@ -416,7 +414,7 @@ usageErrorType Sstat(char* name)
 	entry = findiNodeByName(name, CD);
 	if (entry == NULL)
 	{
-		printf("stat: cannot stat '%s': No such file or directory\n", name);
+		PrintOutPut("stat: cannot stat '%s': No such file or directory\n", name);
 	}
 	else
 	{
@@ -436,7 +434,7 @@ usageErrorType Sls()
 	
 	entrySize = CD->size;
 	
-	printf("..\n.\n");
+	PrintOutPut("..\n.\n");
 	
 	int* entryIndexArray;
 	entryIndexArray = (int*)malloc(sizeof(int)*entrySize);
@@ -463,12 +461,12 @@ usageErrorType Scat(char* name)
 	iNode* entry = findiNodeByName(name, CD);
 	if (entry == NULL)
 	{
-		printf("cat: %s: No such file or directory\n", name);
+		PrintOutPut("cat: %s: No such file or directory\n", name);
 		return ioError;
 	}
 	else if (entry->type == iNode_Dir)
 	{
-		printf("cat: %s: Is a directory\n", name);
+		PrintOutPut("cat: %s: Is a directory\n", name);
 		return ioError;
 	}
 	
@@ -492,12 +490,12 @@ usageErrorType Scp(char* src, char* dest)
 	sEntry = findiNodeByName(src, CD);
 	if (sEntry == NULL)
 	{
-		printf("cp: %s: No such file or directory\n", src);
+		PrintOutPut("cp: %s: No such file or directory\n", src);
 		return ioError;
 	}
 	else if (sEntry->type == iNode_Dir)
 	{
-		printf("cp: %s: Is a directory\n", src);
+		PrintOutPut("cp: %s: Is a directory\n", src);
 		return ioError;
 	}
 	
@@ -547,7 +545,7 @@ usageErrorType Simport(char* srcname, char* destname)
 	// check if the dest file already exist
 	if (dEntry != NULL)
 	{
-		printf("import: File already exist!\n");
+		PrintOutPut("import: File already exist!\n");
 		return ioError;
 	}
 	
@@ -562,7 +560,9 @@ usageErrorType Simport(char* srcname, char* destname)
 	// open and create dest file. Don't have to check if opened
 	efd = do_open(destname, "w", FALSE);
 	
-	while ((rs = read(ifd, buf, BUFFER_SIZE)) > 0)
+	// each time read in at most buffer_size - 1 bytes, so the last
+	// byte is 0 and the whole buffer is a valid string 
+	while ((rs = read(ifd, buf, BUFFER_SIZE - 1)) > 0)
 	{
 		Swrite(efd, buf);
 		memset(buf, 0, BUFFER_SIZE);
@@ -588,7 +588,7 @@ usageErrorType Sexport(char* srcname, char* destname)
 	// check if no source file found
 	if (sEntry == NULL)
 	{
-		printf("export: No file found!\n");
+		PrintOutPut("export: No file found!\n");
 		return ioError;
 	}
 	
@@ -752,7 +752,7 @@ usageErrorType writeEntryInBlock(int blockIndex, int entryIndex, int freeNode)
 		
 		if (i  == BLOCK_SIZE /INDEX_LENGTH)
 		{
-			printf("Entry number exceed maxima!\n");
+			PrintOutPut("Entry number exceed maxima!\n");
 			close(fd);
 			return ioError;
 		}
@@ -831,11 +831,11 @@ void PrintEntry(iNode* entry)
 	{
 	if (entry->type == iNode_Dir)
 	{
-		printf("%s/\n", entry->fileName);
+		PrintOutPut("%s/\n", entry->fileName);
 	}
 	else if (entry->type == iNode_File)
 	{
-		printf("%s\n", entry->fileName);
+		PrintOutPut("%s\n", entry->fileName);
 	}
 }
 			
@@ -908,7 +908,7 @@ usageErrorType PrintTree(iNode* entry, int level)
 	
 	PrintDash(level);
 	
-	printf("%s\n", entry->fileName);
+	PrintOutPut("%s\n", entry->fileName);
 	
 	findSubEntries(entryIndexArray, entry);
 	
@@ -922,7 +922,7 @@ usageErrorType PrintTree(iNode* entry, int level)
 		else if (child->size == 0)
 		{
 			PrintDash(level+1);
-			printf("%s\n", child->fileName);
+			PrintOutPut("%s\n", child->fileName);
 		}
 		else
 		{
@@ -939,7 +939,7 @@ void PrintDash(int level)
 	int i;
 	for (i = 0; i < level; i++)
 	{
-		printf("-");
+		PrintOutPut("-");
 	}
 }
 
@@ -966,7 +966,7 @@ usageErrorType mkdir_unit(char* inputDir)
 	entrySize = CD->size;
 	if (entrySize >= MAX_ENTRY_SIZE)
 	{
-		printf("Err: Maxmum entry size (%d) exceeded!\n", entrySize);
+		PrintOutPut("Err: Maxmum entry size (%d) exceeded!\n", entrySize);
 		return ioError;
 	}
 		
@@ -974,7 +974,7 @@ usageErrorType mkdir_unit(char* inputDir)
 	int freeNode = get_free_iNode();
 	if (freeNode == -1)
 	{
-		printf("Not Enough iNode available!\n");
+		PrintOutPut("Not Enough iNode available!\n");
 		return ioError;
 	}
 	
@@ -1140,7 +1140,7 @@ usageErrorType createFile(char* filename)
 	freeNode = get_free_iNode();
 	if (freeNode == -1)
 	{
-		printf("Not Enough iNode available!\n");
+		PrintOutPut("Not Enough iNode available!\n");
 		return ioError;
 	}
 	
@@ -1157,7 +1157,7 @@ usageErrorType createFile(char* filename)
 	int block4Data = get_free_block();
 	if (block4Data == -1)
 	{
-		printf("Not Enough free Block available!\n");
+		PrintOutPut("Not Enough free Block available!\n");
 		return -1;
 	}	
 	entry->directPtr[0] = block4Data;
@@ -1187,7 +1187,7 @@ usageErrorType addSubEntry(iNode* CD, int freeNode)
 		firstAvailPoint = findAvailableEntry(CD);
 		if (firstAvailPoint == -1)
 		{
-			printf("Entry Size error!\n");
+			PrintOutPut("Entry Size error!\n");
 			return ioError;
 		}
 		
@@ -1254,8 +1254,8 @@ int addOpenFile(iNode* entry, char flag)
 			// if the file was opened with 'r', offset is at the begining;
 			// otherwise, the offset is at the end
 			g_pointer->openedFiles[i].offset = flag == 'r' ? 0 : entry->size;
-			g_pointer->openedFiles[i].buf = (char*)malloc(BUFFER_SIZE + 1);
-			memset(g_pointer->openedFiles[i].buf, 0, BUFFER_SIZE + 1);
+			g_pointer->openedFiles[i].buf = (char*)malloc(BUFFER_SIZE);
+			memset(g_pointer->openedFiles[i].buf, 0, BUFFER_SIZE);
 			g_pointer->openedFiles[i].bufUsed = 0;
 			g_pointer->openedFiles[i].flag = flag;
 			g_pointer->openedFileCount ++;
@@ -1323,9 +1323,9 @@ int checkOpened(iNode* entry)
 // output: no
 usageErrorType PrintStat(iNode* entry)
 {
-	printf("File: '%s'\n", entry->fileName);
-	printf("Size: %d\n", entry->size);
-	printf("Type: %s\n", entry->type == iNode_Dir ?
+	PrintOutPut("File: '%s'\n", entry->fileName);
+	PrintOutPut("Size: %d\n", entry->size);
+	PrintOutPut("Type: %s\n", entry->type == iNode_Dir ?
 										  "directory" : "regular file");
 	
 	return noError;	
@@ -1406,7 +1406,7 @@ int calcBlockIndex(int cBlock, iNode* entry)
 	else
 	{
 		// too many, not considered for now ()
-		printf("Too many blocks for this system to handle!\n");
+		PrintOutPut("Too many blocks for this system to handle!\n");
 		return -1;
 	}
 }
@@ -1432,19 +1432,11 @@ int locateIndex(int offset, int index)
 // comments: depending on the file size, 1 ~ 3 assign-block operation might occur
 int assignNewBlock(iNode* entry)
 {
-	/*
-	if (entry->size < BLOCK_SIZE)
-	{
-		printf("Don't need to assign extra block!\n");
-		return -1;
-	}
-	*/
-	
 	// assign a new block as data block
 	int block4Data = get_free_block();
 	if (block4Data == -1)
 	{
-		printf("Not Enough free Block available!\n");
+		PrintOutPut("Not Enough free Block available!\n");
 		return -1;
 	}	
 	
@@ -1575,7 +1567,7 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 {
 	if (strlen(flag) > 1 || (*flag != 'r' && *flag != 'w'))
 	{
-		printf("Open flag error! Please use 'r' or 'w' only!\n");
+		PrintOutPut("Open flag error! Please use 'r' or 'w' only!\n");
 		return -1;
 	}
 	
@@ -1592,12 +1584,12 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 	}	
 	else if (entry->type == iNode_Dir)
 	{
-		printf("Open: '%s' is not a file!\n", filename);
+		PrintOutPut("Open: '%s' is not a file!\n", filename);
 		return ioError;
 	}
 	else if (checkOpen  && (openFd = checkOpened(entry)) != -1)
 	{
-		printf("File already opened, fd = %d\n", openFd);
+		PrintOutPut("File already opened, fd = %d\n", openFd);
 		return -1;
 	}
 	else
@@ -1607,7 +1599,7 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 	
 	if (openFd == -1)
 	{
-		printf("File open error!\n");
+		PrintOutPut("File open error!\n");
 	}
 		
 	return (openFd);
@@ -1700,4 +1692,22 @@ usageErrorType copy_data_via_block(int fd, int sblock, int dblock)
 	rs = write(fd, buf, BLOCK_SIZE);
 	
 	return noError;
+}
+
+void PrintOutPut(const char *format, ...)
+{
+	 va_list args;
+   va_start(args, format);
+    
+    
+	if (outputFlag == FALSE)
+	{
+		vprintf(format, args);
+	}
+	else
+	{
+		vfprintf(outputStream, format, args);
+	}
+	
+	va_end(args);
 }
