@@ -69,6 +69,7 @@ usageErrorType parseCommand(char* command)
 	PrintOutPut("==============command called: %s =====================\n", cmds[0]);
 
 	if (strcmp(cmds[0], "mkfs") != 0 &&
+			strcmp(cmds[0], "sh") != 0 &&
 		  g_pointer->sb->totalBlocks == 0 &&
 		  g_pointer->sb->totalINode == 0)
   {
