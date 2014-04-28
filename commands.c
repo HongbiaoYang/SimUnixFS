@@ -43,6 +43,7 @@ usageErrorType Smkfs()
 	inode->selfIndex = 0;	// current directory: .
 	inode->parentIndex = 0;  // parent directory: ..
 	inode->size = 0; // number of sub directory and files
+	inode->link = 1;
 	
 	sb->totalBlocks = BLOCK_COUNT;
 	sb->freeBlocks = BLOCK_COUNT;
@@ -109,7 +110,7 @@ usageErrorType do_read(int fd, char* buffer, int size)
 		handler = g_pointer->openedFiles + fd;
 	}
 	
-	if (handler->flag != 'r')
+	if (handler->flag != 'r' && handler->flag != '+')
 	{
 		PrintOutPut("Read failed! The file is write only!\n");
 		return ioError;
@@ -147,7 +148,7 @@ usageErrorType Swrite(int fd, char* buffer)
 		handler = g_pointer->openedFiles + fd;
 	}
 	
-	if (handler->flag != 'w')
+	if (handler->flag != 'w' && handler->flag != '+')
 	{
 		PrintOutPut("Write failed! The file is read only!\n");
 		return ioError;
@@ -526,10 +527,7 @@ usageErrorType Scp(char* src, char* dest)
 
 usageErrorType Stree()
 {
-	iNode* root = g_pointer->firstiNode;
-	
-	PrintTree(root, 0);	
-	
+	PrintTree(g_pointer->curDirNode, 0);	
 	return (noError);
 }
 
@@ -905,27 +903,29 @@ usageErrorType PrintTree(iNode* entry, int level)
 	int* entryIndexArray;
 	
 	entryIndexArray = (int*)malloc(sizeof(int) * entry->size);
+
 	
-	PrintDash(level);
-	
-	PrintOutPut("%s\n", entry->fileName);
 	
 	findSubEntries(entryIndexArray, entry);
+
 	
 	for (i = 0; i < entry->size; i++)
 	{
 		child = g_pointer->firstiNode + entryIndexArray[i];
-		if (child->type != iNode_Dir)
-		{
-			continue;
+		if (child->type == iNode_File)
+		{				
+			PrintDash(level);	
+			PrintOutPut("%s (%d bytes)\n", child->fileName, child->size);
 		}
-		else if (child->size == 0)
+		else if (child->type == iNode_Dir && child->size == 0)
 		{
-			PrintDash(level+1);
+			PrintDash(level);
 			PrintOutPut("%s\n", child->fileName);
 		}
 		else
-		{
+		{			
+			PrintDash(level);	
+			PrintOutPut("%s\n", child->fileName);
 			PrintTree(child, level + 1);
 		}
 	}
@@ -984,6 +984,7 @@ usageErrorType mkdir_unit(char* inputDir)
 	newDir->parentIndex = g_pointer->currentDir;
 	newDir->type = iNode_Dir;
 	strcpy(newDir->fileName, dirname);	
+	newDir->link = 1;
 	
 	addSubEntry(CD, freeNode);
 	
@@ -1150,6 +1151,7 @@ usageErrorType createFile(char* filename)
 	entry->parentIndex = CD->selfIndex;
 	entry->size = 0;
 	strcpy(entry->fileName, filename);
+	entry->link = 1;
 	entry->offset = 0;
 	entry->link = 1;
 	
@@ -1223,7 +1225,7 @@ usageErrorType addSubEntry(iNode* CD, int freeNode)
 	sync_meta_to_disk();	
 }
 
-int openFile(char* filename, char flag)
+int openFile(char* filename, char* flag)
 {
 	iNode *CD, *entry;
 	int fd;
@@ -1240,7 +1242,7 @@ int openFile(char* filename, char flag)
 // input: iNode of the file, open flag(w/r)
 // output: the index of the open-file global pointer
 // error: return -1 if the opened file reaches the maxima
-int addOpenFile(iNode* entry, char flag)
+int addOpenFile(iNode* entry, char* flag)
 {
 	int i, openCnt;
 		
@@ -1251,14 +1253,26 @@ int addOpenFile(iNode* entry, char flag)
 		{	
 			g_pointer->openedFiles[i].oNode = entry;
 			
-			// if the file was opened with 'r', offset is at the begining;
-			// otherwise, the offset is at the end
-			g_pointer->openedFiles[i].offset = flag == 'r' ? 0 : entry->size;
+			// offset always at the begining
+			g_pointer->openedFiles[i].offset = 0;
 			g_pointer->openedFiles[i].buf = (char*)malloc(BUFFER_SIZE);
 			memset(g_pointer->openedFiles[i].buf, 0, BUFFER_SIZE);
-			g_pointer->openedFiles[i].bufUsed = 0;
-			g_pointer->openedFiles[i].flag = flag;
+			g_pointer->openedFiles[i].bufUsed = 0;			
 			g_pointer->openedFileCount ++;
+			
+			// assign the flag bit
+			if (strcmp(flag, "w") == 0)
+			{
+				g_pointer->openedFiles[i].flag = 'w';
+			}
+			else if (strcmp(flag, "r") == 0)
+			{
+				g_pointer->openedFiles[i].flag = 'r';
+			}
+			else 
+			{
+				g_pointer->openedFiles[i].flag = '+';
+			}
 			
 			return i;
 		}
@@ -1323,8 +1337,21 @@ int checkOpened(iNode* entry)
 // output: no
 usageErrorType PrintStat(iNode* entry)
 {
+	int nBlock;
+	
+	if (entry->type == iNode_Dir)
+	{
+		nBlock = (entry->size - 12) / INDEX_IN_SIN + 1;
+	}
+	else if (entry->type == iNode_File)
+	{
+		nBlock = entry->size / BLOCK_SIZE + 1;
+	}
+	
 	PrintOutPut("File: '%s'\n", entry->fileName);
 	PrintOutPut("Size: %d\n", entry->size);
+	PrintOutPut("Blocks: %d\n", nBlock);
+	PrintOutPut("Link: %d\n", entry->link);
 	PrintOutPut("Type: %s\n", entry->type == iNode_Dir ?
 										  "directory" : "regular file");
 	
@@ -1339,7 +1366,8 @@ usageErrorType sync_data_to_disk(OpenedFile* handler)
 {
 	int fsize, cBlock, cOffset, cBlockIndex, nBlockIndex;
 
-	fsize = handler->oNode->size;
+	// fsize = handler->oNode->size;
+	fsize = handler->offset;
 	cBlock = fsize / BLOCK_SIZE;
 	cOffset = fsize - BLOCK_SIZE * cBlock;
 	
@@ -1565,9 +1593,12 @@ usageErrorType load_bytes_from_block(int ablock, int offset, int actualBytes,
 
 int do_open(char* filename, char* flag, BOOL checkOpen)
 {
-	if (strlen(flag) > 1 || (*flag != 'r' && *flag != 'w'))
+	if (strlen(flag) > 2 || ((strcmp(flag, "r") != 0)
+											 &&  (strcmp(flag, "w") != 0)
+											 &&  (strcmp(flag, "rw") != 0)
+											 &&  (strcmp(flag, "wr") != 0	)))
 	{
-		PrintOutPut("Open flag error! Please use 'r' or 'w' only!\n");
+		PrintOutPut("Open flag error! Please must contain 'w' or 'r' only!\n");
 		return -1;
 	}
 	
@@ -1580,7 +1611,7 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 	if (entry == NULL)
 	{
 		createFile(filename);
-		openFd = openFile(filename, *flag);		
+		openFd = openFile(filename, flag);		
 	}	
 	else if (entry->type == iNode_Dir)
 	{
@@ -1594,7 +1625,7 @@ int do_open(char* filename, char* flag, BOOL checkOpen)
 	}
 	else
 	{
-		openFd = openFile(filename, *flag);
+		openFd = openFile(filename, flag);
 	}	
 	
 	if (openFd == -1)
