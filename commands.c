@@ -1063,7 +1063,11 @@ usageErrorType rmdir_unit(iNode* entry)
 			
 			return noError;
 		}
-		else
+		else if (parent->directPtr[i] == 0)  // empty entry
+		{
+			continue;
+		}
+		else	// other file or directory
 		{
 			entrySize--;
 			directEntryCount++;
@@ -1679,6 +1683,18 @@ usageErrorType do_copy_from_entry(iNode* sEntry, char* dest)
 	
 	// copy the first block
 	copy_data_via_block(fd, sEntry->directPtr[0], dEntry->directPtr[0]);
+	
+	// if the data is less than or equal to a block 
+	if (rblock == 1)
+	{
+		dEntry->size = sEntry->size;	
+		close(fd);
+		return noError;
+	}
+	else
+	{
+		dEntry->size = BLOCK_SIZE;
+	}
 	
 	// copy the rest of the block
 	for (i = 1; i < rblock; i++)
