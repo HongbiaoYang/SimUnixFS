@@ -1783,11 +1783,27 @@ void PrintOutPut(const char *format, ...)
 
 usageErrorType Shelp()
 {
-	char* helpMsg = "ls    - list all files and directories\n"\
-									"mkdir - make a directory\n"\
-									"mkfs  - format the disk\n"\
-									" to be continued..."
-				;
+	char* helpMsg = "exit   - quit the SimUnix shell\n"\
+									"mkfs   - format the disk\n"\
+									"open   - open a file for read/write (e.g. open 123.txt w)\n"\
+									"read   - read bytes from a file (e.g. read 0 10)\n"\
+									"write  - write bytes into a file (e.g. write 0 helloworld)\n"\
+									"seek   - change the current file position (e.g. seek 0 10)\n"\
+									"close  - close the opened file (e.g. close 0)\n"\
+									"mkdir  - make a directory. (e.g. mkdir dir)\n"\
+									"cd     - change current directory (e.g. cd /)\n"\
+									"rmdir  - remove a directory. (e.g. rmdir dir)\n"\
+									"link   - make a hard link. (e.g. link file filelink)\n"\
+									"unlink - remove a link or file. (e.g. unlink file)\n"\
+									"stat   - display file or directory status (e.g. status .)\n"\
+									"ls     - list entries in current directory\n"\
+									"help   - display help message\n"\
+									"cat    - print all contents of a file. (e.g. cat file)\n"\
+									"cp     - copy a file. (e.g. cp src dest)\n"\
+									"tree   - display tree structure from current node.\n"\
+									"import - import a file from host fs to SimUnixFs (e.g. import sample.txt sample)\n"\
+									"export - export a file from SimUnixFs to host fs. (e.g. export sample samle.out)\n"\
+									"sh     - execute a batch script file. (e.g. sh sample.txt)\n";
 		
 	PrintOutPut(helpMsg);
 	
