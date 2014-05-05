@@ -12,28 +12,29 @@ user space. The program uses a fixed size file as the virtual disk, and
 iNode bit map section, the iNode section, the data block map section, and the 
 data block section. 
 
-|super block|-bitMap-|-iNodeMap-|--iNode--|-------------DataBlock-------------|
-|<------------------------Virtual Disk (100M)-------------------------------->|
+|super block|-bitMap-|-iNodeMap-|--iNode--|-------------DataBlock-------------|<br>
+|-------------------------------- Virtual Disk (100M)------------------------------------|
 
 System Design 
 =============
 1. Super block
 The structure of super block is as below:
+
+----------------
 	typedef struct
 	{
 		int totalBlocks;
 		int freeBlocks;
 		int totalINode;
 		int freeINode;
-		
 		int bitMapOffset;
 		int iNodeMapOffset;
 		int iNodeOffset;
 		int dataOffset;
-		
 		int maxOpenFile;
 	} 
 	superBlock;
+-----------------
 	
 The first 4 members are statistic counts of the file system, which are used for 
 initialization / formatting, and free iNode / block management. The next 4 
@@ -49,12 +50,16 @@ and occupied blocks. The size of this array is determined in the super block.
 Each element of this array is a char (takes 1 byte), which set to 1 if the
 corresponding data block is used, and set to 0 if it's empty.
 
+
 3. iNodeMap
 The iNodeMap is similary a the BitMap, but indicating the free iNodes and 
 occupied iNodes. 
 
+
 4. iNode
 The structure of iNodes is as below:
+
+----------------
 	typedef struct
 	{	
 		int directPtr[D_PTR_CNT]; 
@@ -68,6 +73,7 @@ The structure of iNodes is as below:
 		int size;
 		iNode_Type type; 
 	} iNode;
+----------------
 	
 Similar as actual Unix file system, the iNode here is to store the meta data
 of files and directories. Each iNode is associated with a file or directory.
@@ -128,18 +134,21 @@ afford writing all of them back, so we just seek to specific location and do the
 write / read that is necessary.
 The Global Pointers are used to store such meta data for fast access. It has 
 structure as below:
-typedef struct
-{
-superBlock* sb;
-char* bitMapPointer;
-char* freeInodePointer;
-iNode* firstiNode;
-int currentDir;
-iNode* curDirNode;
-OpenedFile* openedFiles;
-int openedFileCount;
-}
-GLOBAL_Pointers;
+
+----------------
+	typedef struct
+	{
+		superBlock* sb;
+		char* bitMapPointer;
+		char* freeInodePointer;
+		iNode* firstiNode;
+		int currentDir;
+		iNode* curDirNode;
+		OpenedFile* openedFiles;
+		int openedFileCount;
+	} 
+	GLOBAL_Pointers;
+----------------
 
 The first 4 are easy to understand, which are the pointer to the actual address
 of the super block, bitMap, iNodeMap and iNode. Every time after the system is 
@@ -157,15 +166,19 @@ the predefined limit.
 7.  Opened File 
 The OpenedFile struct is used to deal with the file access operations. The data
 structure is shown as below:
-typedef struct
-{
-	iNode* oNode;
-	int offset;
-	char* buf;
-	int bufUsed;
-	char flag;
-}
-OpenedFile;
+
+----------------
+	typedef struct
+	{
+		iNode* oNode;
+		int offset;
+		char* buf;
+		int bufUsed;
+		char flag;
+	}
+	OpenedFile;
+
+----------------
 
 From the GLOBAL_Pointer mentioned in the previous section, we see that there is 
 a member "openedFiles", which is used globally, to manage the opened files. The 
@@ -192,15 +205,19 @@ your script), any other command will not be able to proceed.
 Since there are a lot of commands in this system, we are not going to cover all
 of them in this document. To quickly test this system, you can run the commands
 in batch by typing the following command in the console:
+
 --------------------
 sh sample.txt
 --------------------
+
 All commands in the file "sample.txt" (which is a file in the current directory)
 will be executed line by line. If you want to see the output in a file instead
 of dumping them in the console, just add a second argument in your command like:
+
 --------------------
 sh sample.txt output.txt
 --------------------
+
 Then all output will be stored in the file output.txt.
 For more information, type "Help" in the console to see a manual of the command
 list.
