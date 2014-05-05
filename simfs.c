@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 usageErrorType parseCommand(char* command)
 {
 	char* cmds[ARGS] = {NULL};
-	char* p;
+	char *p;
 	int args = 0;
 	
 	// empty command
@@ -66,10 +66,17 @@ usageErrorType parseCommand(char* command)
 	
 	args = process_arguments(command, cmds);
 	
+	for (p = cmds[0]; *p; ++p) 
+	{
+		*p = tolower(*p);
+	}
+	
 	PrintOutPut("==============command called: %s =====================\n", cmds[0]);
 
 	if (strcmp(cmds[0], "mkfs") != 0 &&
 			strcmp(cmds[0], "sh") != 0 &&
+			strcmp(cmds[0], "exit") != 0 &&
+			strcmp(cmds[0], "help") != 0 &&
 		  g_pointer->sb->totalBlocks == 0 &&
 		  g_pointer->sb->totalINode == 0)
   {
@@ -248,6 +255,13 @@ usageErrorType parseCommand(char* command)
 		Sls();
 		return noError;
 	}
+	
+	if (strcmp(cmds[0], "help") == 0)
+	{
+		Shelp();
+		return noError;
+	}
+	
 	if (strcmp(cmds[0], "cat") == 0)
 	{
 		if (args < 2)

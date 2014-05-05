@@ -1156,7 +1156,6 @@ usageErrorType createFile(char* filename)
 	entry->size = 0;
 	strcpy(entry->fileName, filename);
 	entry->link = 1;
-	entry->offset = 0;
 	entry->link = 1;
 	
 	// assign a new block as data block
@@ -1757,4 +1756,17 @@ void PrintOutPut(const char *format, ...)
 	}
 	
 	va_end(args);
+}
+
+usageErrorType Shelp()
+{
+	char* helpMsg = "ls    - list all files and directories\n"\
+									"mkdir - make a directory\n"\
+									"mkfs  - format the disk\n"\
+									" to be continued..."
+				;
+		
+	PrintOutPut(helpMsg);
+	
+	return noError;
 }

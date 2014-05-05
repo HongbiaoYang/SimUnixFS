@@ -72,7 +72,6 @@ int selfIndex;
 int parentIndex;
 int link;
 int size;
-short offset; 
 iNode_Type type; 
 } iNode;
 
@@ -111,10 +110,9 @@ char* bitMapPointer;
 char* freeInodePointer;
 iNode* firstiNode;
 int currentDir;
-void* dataPointer;
+iNode* curDirNode;
 OpenedFile* openedFiles;
 int openedFileCount;
-iNode* curDirNode;
 }
 GLOBAL_Pointers;
 
@@ -183,3 +181,4 @@ usageErrorType do_copy_from_entry(iNode* sEntry, char* dest);
 usageErrorType copy_data_via_block(int fd, int sblock, int dblock);
 usageErrorType batch_execute_output(char* script, char* output);
 void PrintOutPut(const char *format, ...);
+usageErrorType Shelp();

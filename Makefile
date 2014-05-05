@@ -10,8 +10,9 @@ CFLAGS = -g -ggdb3
 #	@echo $(OBJS)
 #	@echo $(TARGET)
 #	@echo %.o
+#	@echo $^ $@
 #	@echo "end"
-#	
+	
 	
 .PHONY: all clean
 all: $(TARGET)
