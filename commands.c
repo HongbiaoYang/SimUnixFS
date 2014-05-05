@@ -506,6 +506,8 @@ usageErrorType Scp(char* src, char* dest)
 		if (dEntry->type == iNode_Dir)
 		{
 			changeDirectory(dEntry);
+			// if dest is a directory, copy the src into the dest directory
+			// with the same file name
 			do_copy_from_entry(sEntry, src);
 			changeDirectory(CD);
 		}
@@ -1006,6 +1008,14 @@ int findiNodeIndexByName(char* name, iNode* CD)
 	{
 		return CD->parentIndex;
 	}
+	else if (strncmp(name, "./", 2) == 0)
+	{
+		return findiNodeIndexByName(name + 2, CD);
+	}
+	else if (strncmp(name, "../", 3) == 0)
+	{
+		return findiNodeIndexByName(name + 3, g_pointer->firstiNode + CD->parentIndex);
+	}
 	
 	entrySize = CD->size;
 	entryIndexArray = (int *)malloc(entrySize * sizeof(int));
@@ -1137,10 +1147,23 @@ usageErrorType rmdir_unit(iNode* entry)
 usageErrorType createFile(char* filename)
 {
 	int entrySize, freeNode, firstAvailPoint;
-	iNode *CD, *entry;
+	iNode *CD, *entry;	
 	
 	CD = g_pointer->curDirNode;
 	entrySize = CD->size;
+	
+	if (strncmp(filename, "./", 2) == 0)
+	{
+		return createFile(filename + 2);
+	}
+	else if (strncmp(filename, "../", 3) == 0)
+	{
+		changeDirectory(g_pointer->firstiNode + CD->parentIndex);
+		createFile(filename + 3);
+		changeDirectory(g_pointer->firstiNode + CD->selfIndex);
+		return noError;
+	}
+		
 	
 	freeNode = get_free_iNode();
 	if (freeNode == -1)
